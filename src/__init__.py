@@ -22,3 +22,8 @@ class JsonHandler(BaseHandler):
         self.set_header('Content-Type', 'application/json')
 
         super(BaseHandler, self).write(dumps(chunk))
+
+class AuthJsonHandler(JsonHandler):
+
+    def prepare(self):
+        print('start request')
