@@ -94,7 +94,7 @@ def random_maze(n, m, max_height=0):
 
     return maze
 
-
+# 打印迷宫
 def print_maze(maze, print_height=False):
     n = len(maze)
     m = len(maze[0])
@@ -146,7 +146,214 @@ def print_maze(maze, print_height=False):
         print("x x ", end='')
     print("")
 
-maze = random_maze(20, 20, max_height=0)
+class State(object):
 
-print_maze(maze, print_height=False)
+    dx = (1, 0, -1, 0)
+    dy = (0, 1, 0, -1)
+
+    def __init__(self, x, y, direction, path):
+        self.x = x
+        self.y = y
+        self.path = path
+        self.direction = direction
+        self.step = len(path)
+        return
+
+    # opt 0 向前, 1 左转 -1 右转
+    def transform(self, opt, maze):
+        if opt == 0:
+            flag, data = self._move(maze=maze)
+            if not flag:
+                return False
+            self.x, self.y = data
+        elif opt in [-1, 1]:
+            self.direction = (4 + self.direction + opt) % 4
+        else:
+            raise ValueError('opt error')
+        self.path.append(opt)
+        self.step += 1
+        return True
+
+    def _move(self, maze):
+        x2 = self.x + State.dx[self.direction]
+        y2 = self.y + State.dy[self.direction]
+        n = len(maze)
+        m = len(maze[0])
+
+        if x2 < 0 or y2 < 0 or x2 >= n or y2 >= m:
+            return False, '越界'
+
+        # (向右的墙壁, 向下的墙壁, 格子高度) 0 为不通
+        grid1 = maze[self.x][self.y]
+        grid2 = maze[x2][y2]
+
+        grid = grid1
+        if self.direction >= 2:
+            grid = grid2
+        idx = 1 - self.direction % 2
+        if grid[idx] == 1:
+            return True, (x2, y2)
+        return False, '墙壁'
+
+
+    def __lt__(self, other):
+        return self.step < other.step
+
+def start_state():
+    return State(**{
+        'x': 0,
+        'y': 0,
+        'direction': 0,
+        'path': [],
+    })
+
+# 遍历迷宫最短路径
+def bfs_maze(maze):
+    n = len(maze)
+    m = len(maze[0])
+
+    start_x = 0
+    start_y = 0
+
+    end_x = n - 1
+    end_y = m - 1
+
+    maze_min_step = []
+    for i in range(n):
+        arr = []
+        for j in range(m):
+            arr.append({})
+        maze_min_step.append(arr)
+
+    from queue import PriorityQueue
+    q = PriorityQueue()
+    q.put_nowait(start_state())
+    import copy
+    while not q.empty():
+        s = q.get_nowait()
+        if s.x == end_x and s.y == end_y:
+            return True, s.path
+        for opt in [0, 1, -1]:
+            ss = State(**{
+                'x': s.x,
+                'y': s.y,
+                'direction': s.direction,
+                'path': copy.deepcopy(s.path),
+            })
+            flag = ss.transform(opt=opt, maze=maze)
+            if not flag:
+                continue
+            x = ss.x
+            y = ss.y
+            if ss.direction in maze_min_step[x][y] and maze_min_step[x][y][ss.direction] <= ss.step:
+                continue
+            maze_min_step[x][y][ss.direction] = ss.step
+            q.put_nowait(ss)
+    return False, '不可达'
+
+def _get_block(block_id, block_list):
+    if block_id < 0 or block_id >= len(block_list):
+        raise ValueError('模块%d未找到!' % block_id)
+    return block_list[block_id]
+
+def _dfs_path(path, block_list, block_dict, p_block_id=None):
+    for opt in path:
+        if isinstance(opt, int):
+            if opt not in [-1, 0, 1]:
+                raise ValueError('路径非法')
+        elif isinstance(opt, dict):
+            if 'id' not in opt:
+                raise ValueError('路径非法')
+            block_id = opt['id']
+            if block_id not in block_dict:
+                block_dict[block_id] = 0
+            block_dict[block_id] = block_dict[block_id] + 1
+            block = _get_block(block_id=block_id, block_list=block_list)
+            if p_block_id == block_id:
+                raise ValueError('模块内不能包含自身!')
+            _dfs_path(path=block, block_list=block_list, block_dict=block_dict, p_block_id=block_id)
+        else:
+            raise ValueError('路径非法')
+
+# 返回 步数
+def run_block(state, block_id, block_list, block_dict, maze):
+    block = _get_block(block_id=block_id, block_list=block_list)
+    step = 0
+    i = 1
+    if block_dict[block_id] > 1:
+        i = 0
+        step = 1
+    for opt in block:
+        if isinstance(opt, int):
+            flag = state.transform(opt=opt, maze=maze)
+            if not flag:
+                return -1
+            step += i
+        else:
+            step_tmp = run_block(state=state, block_id=opt['id'], block_list=block_list, block_dict=block_dict, maze=maze)
+            if step_tmp == -1:
+                return -1
+            step += step_tmp
+    return step
+
+# 验证 路径  返回 步数
+def validate_maze_path(path, block_list, maze):
+
+    for block in block_list:
+        if len(block) < 2:
+            raise ValueError('模块必须包含2步以上操作!')
+
+    block_dict = {}
+    _dfs_path(path=path, block_list=block_list, block_dict=block_dict)
+    state = start_state()
+    n = len(maze)
+    m = len(maze[0])
+
+    end_x = n - 1
+    end_y = m - 1
+
+    step = 0
+    for opt in path:
+        if isinstance(opt, int):
+            flag = state.transform(opt=opt, maze=maze)
+            if not flag:
+                step = -1
+                break
+            step += 1
+        else:
+            step_tmp = run_block(state=state, block_id=opt['id'], block_list=block_list, block_dict=block_dict, maze=maze)
+            if step_tmp == -1:
+                step = -1
+                break
+            step += step_tmp
+
+    if step == -1 or state.x != end_x or state.y != end_y:
+        return False, '你似乎迷失在迷宫里了...'
+    return True, step
+
+if __name__ == '__main__':
+
+    maze = random_maze(10, 10, max_height=0)
+
+    print_maze(maze, print_height=False)
+
+    # maze = [[[1, 1, 0], [1, 1, 0], [1, 1, 0], [0, 0, 0]], [[0, 0, 0], [0, 1, 0], [1, 0, 0], [0, 1, 0]], [[1, 1, 0], [0, 0, 0], [1, 1, 0], [0, 1, 0]], [[1, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]]
+    import time
+
+    start_time = time.time()
+
+    flag, path = bfs_maze(maze)
+
+    # print(path)
+    #
+    block_list = []
+    # block_list.append((1, 0))
+    # block_list.append((-1, 0))
+    # block_list.append(({'id': 1}, {'id': 0}))
+    # path = [{'id': 0}, 0, {'id': 2}, {'id': 1}, 0]
+    #
+    # print(path)
+
+    print(validate_maze_path(path=path, block_list=block_list, maze=maze))
+
 
