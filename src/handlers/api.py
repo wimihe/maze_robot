@@ -11,7 +11,6 @@ from src import utils
 
 class Login(AuthJsonHandler):
     async def post(self):
-        print('----')
         code = self.get_body_argument('code')
         encryptedData = self.get_body_argument('encryptedData')
         iv = self.get_body_argument('iv')
@@ -24,11 +23,11 @@ class Login(AuthJsonHandler):
             province = userinfo['province']
             avatarUrl = userinfo['avatarUrl']
             city = userinfo['city']
-            user = utils.init_user(uid=openid, nick=nickName, gender=gender, city=city, photo=avatarUrl,
+            user = await utils.init_login(uid=openid, nick=nickName, gender=gender, city=city, photo=avatarUrl,
                                    province=province, session_key=session_key)
             self.write(user)
-        print(userinfo)
-        self.write(userinfo)
+        else:
+            self.write_error_custom(400, '认证失败!')
 
 class FetchMaze(JsonHandler):
     def get(self):

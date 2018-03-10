@@ -14,5 +14,5 @@ class MazeRobot(tornado.web.Application):
 
     def __init__(self):
         self.db = motor.motor_tornado.MotorClient(**utils.fetch_mongodb_for_motor(settings=settings))[settings.MONGODB_DB_NAME]
-        BaseModel.db = self.db
+        BaseModel._db = self.db
         super(MazeRobot, self).__init__(routers.urls)

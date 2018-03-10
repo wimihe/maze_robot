@@ -7,7 +7,7 @@ from bson.json_util import dumps
 class BaseHandler(tornado.web.RequestHandler):
 
     def db(self):
-        return self.application.db['dev4db_develop']
+        return self.application.db
 
 
 class JsonHandler(BaseHandler):
@@ -22,6 +22,11 @@ class JsonHandler(BaseHandler):
         self.set_header('Content-Type', 'application/json')
 
         super(BaseHandler, self).write(dumps(chunk))
+
+    def write_error_custom(self, status_code, reason):
+        data = {'status_code': status_code, 'reason': reason}
+        self.set_status(status_code=status_code, reason=reason)
+        self.write(data)
 
 class AuthJsonHandler(JsonHandler):
 

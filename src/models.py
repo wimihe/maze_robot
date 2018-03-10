@@ -6,6 +6,8 @@
 import re
 import datetime
 
+from src.tools import mongo_tool
+
 class BaseField(object):
 
     def __init__(self, require=False):
@@ -113,22 +115,61 @@ class DatetimeField(BaseField):
 
 class BaseModel(object):
 
-    db = None
+    _db = None
 
     @classmethod
-    def filter(cls, **kwargs):
+    def __field_list__(cls):
+        field_list = getattr(cls, '__field_list', None)
+        if field_list == None:
+            field_list = []
+            for i in dir(cls):
+                field = getattr(cls, i)
+                if isinstance(field, BaseField):
+                    field_list.append({'id': i, 'field': field})
+            setattr(cls, '__field_list', field_list)
+        return field_list
+
+    @classmethod
+    def __filed_dict__(cls):
+        filed_dict = getattr(cls, '__filed_dict', None)
+        if filed_dict == None:
+            attr_list = cls.__field_list__()
+            filed_dict = {}
+            for item in attr_list:
+                filed_dict[item['id']] = item['field']
+            setattr(cls, '__filed_dict', filed_dict)
+        return filed_dict
+
+    @classmethod
+    def db(cls):
+        return cls._db[cls.Meta.db_table]
+
+    @classmethod
+    def find(cls, filter):
         pass
+
+    @classmethod
+    async def find_one(cls, filter):
+        return await mongo_tool.find_one(db=cls.db(), filter=filter)
 
     def __init__(self, **kwargs):
         self._id = None
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
+    def to_dict(self):
+        keys = self._field_dict().keys()
+        result = {}
+        for key in keys:
+            if hasattr(self, key):
+                result[key] = getattr(self, key)
+        return result
+
     def _field_dict(self):
-        return {}
+        return self.__class__.__filed_dict__()
 
     def _field_list(self):
-        return []
+        return self.__class__.__field_list__()
 
     def _is_create(self):
         return self._id == None
@@ -161,8 +202,9 @@ class BaseModel(object):
             else:
                 data[key] = getattr(self, key)
                 field.validate(data[key])
+        return data
 
-    def save(self, update_fields=None):
+    async def save(self, update_fields=None):
         if not self._is_create() and update_fields:
             update_fields = list(set(update_fields))
             field_dict = self._field_dict()
@@ -174,30 +216,42 @@ class BaseModel(object):
 
         else:
             keys = list(self._field_dict().keys())
+        await self._save(params=self._get_save_data(keys=keys))
 
-        self._save(params=self._get_save_data(keys=keys))
+    async def _add(self, data):
+        self._id = await mongo_tool.insert(db=self.__db__(), data=data)
 
-    def _add(self, data):
-        # data =
-        # self._id = data['_id']
+    async def _update(self, data):
         pass
+        # mongo_tool.update(db=self.__db(),)
 
-    def _update(self, data):
-        pass
-
-    def _save(self, params):
+    async def _save(self, params):
         if not params:
             return
         if self._is_create():
-            self._add(params)
+            await self._add(params)
 
         else:
-            self._update(params)
+            await self._update(params)
+
+    def __db__(self):
+        return self.__class__.db()
 
     class Meta:
         db_table = None
 
-# class User(object):
+class User(BaseModel):
+
+    uid = TextField(require=True)
+    nick = TextField(require=True)
+    gender = IntField(require=True)
+    photo = TextField(require=True)
+    province = TextField(require=False)
+    city = TextField(require=False)
+
+    secret_key = TextField(require=True)
+
+    class Meta:
+        db_table = 'User'
 
 
-import pdb;pdb.set_trace()

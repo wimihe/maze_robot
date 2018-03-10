@@ -2,3 +2,4 @@ tornado==4.5.3
 motor==1.2.1
 pycrypto==2.6.1
 requests
+pyjwt==1.6.0
