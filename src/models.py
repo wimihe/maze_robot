@@ -222,8 +222,7 @@ class BaseModel(object):
         self._id = await mongo_tool.insert(db=self.__db__(), data=data)
 
     async def _update(self, data):
-        pass
-        # mongo_tool.update(db=self.__db(),)
+        await mongo_tool.update(db=self.__db__(), filter={'_id': self._id}, data=data)
 
     async def _save(self, params):
         if not params:

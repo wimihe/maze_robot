@@ -6,10 +6,11 @@ from src import JsonHandler
 from src import AuthJsonHandler
 from src.tools import mongo_tool
 from src.tools import wx_tool
+from src.auth import Auth
 
 from src import utils
 
-class Login(AuthJsonHandler):
+class Login(JsonHandler):
     async def post(self):
         code = self.get_body_argument('code')
         encryptedData = self.get_body_argument('encryptedData')
@@ -25,10 +26,17 @@ class Login(AuthJsonHandler):
             city = userinfo['city']
             user = await utils.init_login(uid=openid, nick=nickName, gender=gender, city=city, photo=avatarUrl,
                                    province=province, session_key=session_key)
+
+            flag, token = Auth.encode_auth_token(uid=user['uid'], secret_key=user['secret_key'])
+            if not flag:
+                self.write_error_custom(400, 'token error!')
+            del user['secret_key']
+            user['token'] = token.decode()
+
             self.write(user)
         else:
             self.write_error_custom(400, '认证失败!')
 
-class FetchMaze(JsonHandler):
+class FetchMaze(AuthJsonHandler):
     def get(self):
-        pass
+        self.write('success')

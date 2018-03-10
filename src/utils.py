@@ -15,8 +15,19 @@ def fetch_mongodb_for_motor(settings):
         'port': fetch_settings_val(settings=settings, key=constants.MONGODB_PORT_KEY, default=None),
     }
 
-async def init_login(uid, nick, gender, city, photo, province, session_key):
+def init_secret_key(s):
+    import hashlib, datetime
+    return hashlib.new("md5", str(str(datetime.datetime.now().timestamp()) + s).encode('ascii')).hexdigest()
 
+async def fetch_secret_key(uid):
+
+    user = await models.User.find_one({'uid': uid})
+    if not user:
+        return False, '用不存在!'
+    return True, user['secret_key']
+
+async def init_login(uid, nick, gender, city, photo, province, session_key):
+    session_key = init_secret_key(session_key)
     user = await models.User.find_one({'uid': uid})
     if not user:
         print('create')
@@ -33,6 +44,7 @@ async def init_login(uid, nick, gender, city, photo, province, session_key):
         await user.save()
     else:
         print('update')
+        user['secret_key'] = session_key
         user = models.User(**user)
         await user.save()
 
