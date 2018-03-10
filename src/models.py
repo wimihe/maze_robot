@@ -97,6 +97,9 @@ class DateField(BaseField):
         self.auto_now_add = auto_now_add
         self.auto_now = auto_now
 
+    def now(self):
+        return self.type.today()
+
 class DatetimeField(BaseField):
 
     def __init__(self, require=False, auto_now_add=False, auto_now=False):
@@ -105,24 +108,15 @@ class DatetimeField(BaseField):
         self.auto_now_add = auto_now_add
         self.auto_now = auto_now
 
+    def now(self):
+        return self.type.now()
+
 class BaseModel(object):
 
     db = None
 
     @classmethod
-    def report(cls, pks, **kwargs):
-        pass
-
-    @classmethod
-    def add(cls, **kwargs):
-        pass
-
-    @classmethod
     def filter(cls, **kwargs):
-        pass
-
-    @classmethod
-    def update(cls, **kwargs):
         pass
 
     def __init__(self, **kwargs):
@@ -136,44 +130,69 @@ class BaseModel(object):
     def _field_list(self):
         return []
 
+    def _is_create(self):
+        return self._id == None
+
+    def _get_save_data(self, keys):
+
+        fields_dict = self._field_dict()
+        is_create = self._is_create()
+        for key in fields_dict.keys():
+            if key in keys:
+                continue
+            field = fields_dict[key]
+            if isinstance(field, (DatetimeField, DateField)):
+                if (is_create and field.auto_now_add) or field.auto_now:
+                    keys.append(key)
+            elif is_create and field.require == True:
+                keys.append(key)
+        data = {}
+        for key in keys:
+            field = fields_dict[key]
+            if isinstance(field, (DateField, DatetimeField)):
+                if (is_create and field.auto_now_add) or field.auto_now:
+                    data[key] = field.now()
+                    setattr(self, key, data[key])
+                    continue
+
+            if not hasattr(self, key):
+                if field.require == True:
+                    raise ValueError('字段%s是必填的' % key)
+            else:
+                data[key] = getattr(self, key)
+                field.validate(data[key])
+
     def save(self, update_fields=None):
-        if self._id != None and update_fields:
+        if not self._is_create() and update_fields:
+            update_fields = list(set(update_fields))
             field_dict = self._field_dict()
-            params = {}
+            keys = []
             for key in update_fields:
                 if key not in field_dict:
                     raise ValueError('无此字段:%s' % key)
-                field = field_dict[key]
-                if not hasattr(self, key):
-                    if field.require == True:
-                        raise ValueError('字段%s是必填的' % key)
-                else:
-                    params[key] = getattr(self, key)
-                    field.validate(params[key])
+                keys.append(key)
 
         else:
-            params = {}
-            for item in self._field_list():
-                key = item['key']
-                field = item['field']
-                if not hasattr(self, key):
-                    if field.require == True:
-                        raise ValueError('字段%s是必填的' % key)
-                else:
-                    params[key] = getattr(self, key)
-                    field.validate(params[key])
+            keys = list(self._field_dict().keys())
 
-        self._save(params=params)
+        self._save(params=self._get_save_data(keys=keys))
+
+    def _add(self, data):
+        # data =
+        # self._id = data['_id']
+        pass
+
+    def _update(self, data):
+        pass
 
     def _save(self, params):
         if not params:
             return
-        if self._id == None:
-            data = self.__class__.add(**params)
-            self._id = data['_id']
+        if self._is_create():
+            self._add(params)
+
         else:
-            # self.__class__.update()
-            pass
+            self._update(params)
 
     class Meta:
         db_table = None
