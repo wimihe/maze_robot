@@ -28,3 +28,26 @@ async def update_many(db, data):
 async def find_one(db, filter):
     result = await db.find_one(filter)
     return result
+
+async def find(db, filter=None, sort=None, fields=None, page=1, page_size=3000):
+    kwargs = {}
+    if filter:
+        kwargs['filter'] = filter
+    if sort:
+        kwargs['sort'] = filter
+    if fields:
+        kwargs['fields'] = filter
+
+    result = db.find(**kwargs)
+
+    total = await result.count()
+
+    if page > 0 and page_size > 0:
+        limit = page_size
+        skip = (page - 1) * page_size
+        result = result.limit(limit).skip(skip)
+    else:
+        limit = total
+
+    return total, await result.to_list(limit)
+

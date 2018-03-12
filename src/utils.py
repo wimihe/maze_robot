@@ -47,5 +47,4 @@ async def init_login(uid, nick, gender, city, photo, province, session_key):
         user['secret_key'] = session_key
         user = models.User(**user)
         await user.save()
-
-    return user.to_dict()
+    return user.to_dict(detail=True)

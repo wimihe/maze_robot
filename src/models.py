@@ -17,7 +17,7 @@ class BaseField(object):
     def validate(self, value):
         if self.type != None:
             if not isinstance(value, self.type):
-                raise ValueError('属性类型必须为:%s' % (str(self.type)))
+                raise ValueError('属性类型必须为:%s 当前为%s' % (str(self.type), type(value)))
 
 class TextField(BaseField):
 
@@ -145,15 +145,19 @@ class BaseModel(object):
         return cls._db[cls.Meta.db_table]
 
     @classmethod
-    def find(cls, filter):
-        pass
+    async def find(cls, filter=None, sort=None, fields=None, page=1, page_size=3000):
+        return await mongo_tool.find(db=cls.db(), filter=filter, sort=sort, fields=fields, page=page, page_size=page_size)
 
     @classmethod
     async def find_one(cls, filter):
         return await mongo_tool.find_one(db=cls.db(), filter=filter)
 
     def __init__(self, **kwargs):
+
         self._id = None
+
+        for key in self.__class__.__filed_dict__().keys():
+            setattr(self, key, None)
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
@@ -200,8 +204,16 @@ class BaseModel(object):
                 if field.require == True:
                     raise ValueError('字段%s是必填的' % key)
             else:
-                data[key] = getattr(self, key)
-                field.validate(data[key])
+                value = getattr(self, key)
+                if value == None:
+                    if field.require == True:
+                        raise ValueError('字段%s是必填的' % key)
+                    continue
+                data[key] = value
+                try:
+                    field.validate(data[key])
+                except Exception as e:
+                    raise ValueError('%s: %s' % (key, str(e)))
         return data
 
     async def save(self, update_fields=None):
@@ -247,10 +259,17 @@ class User(BaseModel):
     photo = TextField(require=True)
     province = TextField(require=False)
     city = TextField(require=False)
-
     secret_key = TextField(require=True)
+    ctime = DatetimeField(require=True, auto_now_add=True)
+    mtime = DatetimeField(require=True, auto_now=True)
 
     class Meta:
         db_table = 'User'
+
+    def to_dict(self, detail=False):
+        data = super(User, self).to_dict()
+        if detail == False and 'secret_key' in data:
+            del data['secret_key']
+        return data
 
 
