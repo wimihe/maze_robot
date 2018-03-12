@@ -6,5 +6,6 @@ from src.handlers import api
 
 urls = [
     (r'/login', api.Login),
-    (r'/test', api.FetchMaze)
+    (r'/maze', api.Maze),
+    (r'/ranklist', api.Ranklist),
 ]

@@ -212,9 +212,6 @@ def bfs_maze(maze):
     n = len(maze)
     m = len(maze[0])
 
-    start_x = 0
-    start_y = 0
-
     end_x = n - 1
     end_y = m - 1
 
@@ -276,7 +273,7 @@ def _dfs_path(path, block_list, block_dict, p_block_id=None):
             raise ValueError('路径非法')
 
 # 返回 步数
-def run_block(state, block_id, block_list, block_dict, maze):
+def run_block(state, block_id, block_list, block_dict, maze, global_grid_count):
     block = _get_block(block_id=block_id, block_list=block_list)
     step = 0
     i = 1
@@ -288,13 +285,25 @@ def run_block(state, block_id, block_list, block_dict, maze):
             flag = state.transform(opt=opt, maze=maze)
             if not flag:
                 return -1
+            flag, count = check_grid_count(state=state, global_grid_count=global_grid_count)
+            if not flag:
+                return -1
             step += i
         else:
-            step_tmp = run_block(state=state, block_id=opt['id'], block_list=block_list, block_dict=block_dict, maze=maze)
+            step_tmp = run_block(state=state, block_id=opt['id'], block_list=block_list, block_dict=block_dict, maze=maze, global_grid_count=global_grid_count)
             if step_tmp == -1:
                 return -1
             step += step_tmp
     return step
+
+def check_grid_count(state, global_grid_count):
+    grid = '%d,%d' % (state.x, state.y)
+    if grid not in global_grid_count:
+        global_grid_count[grid] = 0
+    if global_grid_count[grid] >= 3:
+        return False, '一个格子不能走三次'
+    global_grid_count[grid] = global_grid_count[grid] + 1
+    return True, global_grid_count[grid]
 
 # 验证 路径  返回 步数
 def validate_maze_path(path, block_list, maze):
@@ -312,6 +321,8 @@ def validate_maze_path(path, block_list, maze):
     end_x = n - 1
     end_y = m - 1
 
+    global_grid_count = {}
+
     step = 0
     for opt in path:
         if isinstance(opt, int):
@@ -319,9 +330,13 @@ def validate_maze_path(path, block_list, maze):
             if not flag:
                 step = -1
                 break
+            flag, count = check_grid_count(state=state, global_grid_count=global_grid_count)
+            if not flag:
+                step = -1
+                break
             step += 1
         else:
-            step_tmp = run_block(state=state, block_id=opt['id'], block_list=block_list, block_dict=block_dict, maze=maze)
+            step_tmp = run_block(state=state, block_id=opt['id'], block_list=block_list, block_dict=block_dict, maze=maze, global_grid_count=global_grid_count)
             if step_tmp == -1:
                 step = -1
                 break

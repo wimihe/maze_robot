@@ -34,9 +34,11 @@ async def find(db, filter=None, sort=None, fields=None, page=1, page_size=3000):
     if filter:
         kwargs['filter'] = filter
     if sort:
-        kwargs['sort'] = filter
+        if isinstance(sort, dict):
+            sort = [(key, sort[key]) for key in sort.keys()]
+        kwargs['sort'] = sort
     if fields:
-        kwargs['fields'] = filter
+        kwargs['projection'] = fields
 
     result = db.find(**kwargs)
 

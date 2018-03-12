@@ -4,11 +4,11 @@
 
 from src import JsonHandler
 from src import AuthJsonHandler
-from src.tools import mongo_tool
 from src.tools import wx_tool
 from src.auth import Auth
 
 from src import utils
+from src import models
 
 class Login(JsonHandler):
     async def post(self):
@@ -37,6 +37,39 @@ class Login(JsonHandler):
         else:
             self.write_error_custom(400, '认证失败!')
 
-class FetchMaze(AuthJsonHandler):
-    def get(self):
-        self.write('success')
+class Maze(AuthJsonHandler):
+    async def get(self):
+
+        maze_id = self.get_argument('maze_id')
+
+        flag, maze = await models.Maze.fetch(uid=self.current_user, maze_id=maze_id)
+        if flag:
+            self.write(maze)
+        else:
+            self.write_error_custom(404, maze)
+
+    async def post(self):
+
+        maze_id = self.get_body_argument('maze_id')
+        path = self.get_body_argument('path')
+        block_list = self.get_body_argument('block_list')
+
+        flag, data = await models.Resolve.resolve(maze_id=maze_id, uid=self.current_user, path=path, block_list=block_list)
+
+        if flag:
+            self.write(data)
+        else:
+            self.write_error_custom(400, data)
+
+class MazeList(AuthJsonHandler):
+    async def get(self):
+
+        result = await models.Maze.list()
+
+        self.write(result)
+
+class Ranklist(AuthJsonHandler):
+    async def get(self):
+        maze_id = self.get_argument('maze_id')
+        result = await models.Resolve.ranklist(maze_id=maze_id, top=50)
+        self.write(result)

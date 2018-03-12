@@ -28,8 +28,8 @@ async def fetch_secret_key(uid):
 
 async def init_login(uid, nick, gender, city, photo, province, session_key):
     session_key = init_secret_key(session_key)
-    user = await models.User.find_one({'uid': uid})
-    if not user:
+    flag, user = await models.User.get(uid=uid)
+    if not flag:
         print('create')
         data = dict(
             uid=uid,
