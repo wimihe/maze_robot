@@ -8,7 +8,7 @@ import motor.motor_tornado
 from src import settings
 from src import routers
 from src import utils
-from src.models import BaseModel
+from src.tools.models_tool import BaseModel
 
 class MazeRobot(tornado.web.Application):
 
